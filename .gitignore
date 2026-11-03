@@ -1,0 +1,46 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+crash.log
+
+# Ansible : inventaire genere et secrets
+ansible/inventory.ini
+ansible/.vault_pass
+*.retry
+
+# Cles et environnement
+*.pem
+.env
+
+# Protection supplementaire
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.tfstate*
+*.pem
+*.key
+*.pub
+.env.*
+ansible/inventory*.ini
+**/.terraform/
+**/.terraform.lock.hcl.bak
+
+# Fichiers sensibles
+*.tfvars
+*.tfvars.json
+*.tfstate*
+*.tfplan
+*.pem
+*.key
+.env.*
+ansible/inventory*.ini
+
+# Depots Git separes
+/terraform-aws-ec2-server/
+/terraform/
+
+# Inventaires Ansible generes
+**/inventory.ini

@@ -1,0 +1,116 @@
+
+name: Terraform Apply
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "envs/**"
+      - "modules/**"
+      - ".github/workflows/terraform-apply.yml"
+  schedule:
+    - cron: "0 2 * * *"
+
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  apply-dev:
+    if: ${{ vars.ENABLE_TERRAFORM_APPLY == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: envs/dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.1"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_DEV }}
+          aws-region: us-east-1
+
+      - run: terraform init -input=false
+
+      - run: terraform validate
+
+      - name: Apply DEV
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+        run: terraform apply -auto-approve -input=false
+
+  apply-prod:
+    needs: apply-dev
+    runs-on: ubuntu-latest
+    environment: prod
+    defaults:
+      run:
+        working-directory: envs/prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.1"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_PROD }}
+          aws-region: us-east-1
+
+      - run: terraform init -input=false
+
+      - run: terraform validate
+
+      - name: Apply PROD
+        run: terraform apply -auto-approve -input=false
+
+
+  drift:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: envs/dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.1"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_DEV }}
+          aws-region: us-east-1
+
+      - run: terraform init -input=false
+
+      - name: Detecter le drift
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -input=false -no-color
+          code=$?
+
+          if [ "$code" -eq 0 ]; then
+            echo "Aucune modification detectee"
+          elif [ "$code" -eq 2 ]; then
+            echo "Des modifications sont detectees"
+            exit 1
+          else
+            echo "Erreur Terraform"
+            exit 1
+          fi
+

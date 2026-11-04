@@ -33,7 +33,7 @@ module "web" {
   source = "git::https://github.com/NafiNd/terraform-aws-ec2-server.git?ref=v1.0.0"
 
   name          = "${var.environment}-web"
-  ami_id        = data.aws_ami.debian.id
+  ami_id        = "ami-0738f6157394eaf95"
   instance_type = var.instance_type
   key_name      = aws_key_pair.main.key_name
   admin_cidr    = local.my_cidr
@@ -44,7 +44,7 @@ module "monitoring" {
   source = "git::https://github.com/NafiNd/terraform-aws-ec2-server.git?ref=v1.0.0"
 
   name          = "${var.environment}-monitoring"
-  ami_id        = data.aws_ami.debian.id
+  ami_id        = "ami-0738f6157394eaf95"
   instance_type = var.instance_type
   key_name      = aws_key_pair.main.key_name
   admin_cidr    = local.my_cidr

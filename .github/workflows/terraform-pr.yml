@@ -61,7 +61,8 @@ jobs:
           script: |
             const fs = require('fs');
             const path = 'envs/dev/plan.txt';
-            const plan = fs.readFileSync(path, 'utf8');
+            const fullPlan = fs.readFileSync(path, 'utf8');
+            const plan = fullPlan.match(/^Plan:.*$/m)?.[0] || 'Plan indisponible ou en erreur';
             const code = '${{ steps.plan.outputs.exitcode }}';
             const status = code === '0' ? 'Reussi' : 'Echec';
             const body = `### Terraform DEV - ${status}

@@ -12,3 +12,8 @@ output "ssh_command" {
   description = "Commande de connexion"
   value       = "ssh -i ~/.ssh/novasphere admin@${module.web.public_ip}"
 }
+
+output "alb_dns_name" {
+  description = "Adresse DNS du Load Balancer PROD"
+  value       = aws_lb.web.dns_name
+}

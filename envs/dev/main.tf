@@ -29,7 +29,7 @@ resource "aws_key_pair" "main" {
   public_key = file(pathexpand(var.ssh_public_key_path))
 }
 
-module "web" {
+module "web_dev" {
   source = "git::https://github.com/NafiNd/terraform-aws-ec2-server.git?ref=v1.0.0"
 
   name          = var.environment == "dev" ? "web" : "${var.environment}-web"
@@ -61,7 +61,7 @@ resource "local_file" "inventory" {
   filename        = "${path.module}/../ansible/inventory.ini"
   file_permission = "0644"
   content = templatefile("${path.module}/inventory.tftpl", {
-    web_ip        = module.web.public_ip
+    web_ip        = module.web_dev.public_ip
     monitoring_ip = module.monitoring.public_ip
 
   })
@@ -243,3 +243,8 @@ resource "aws_iam_instance_profile" "web" {
   role = aws_iam_role.web.name
 }
 
+
+moved {
+  from = module.web
+  to   = module.web_dev
+}

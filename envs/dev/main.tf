@@ -83,6 +83,7 @@ module "vpc" {
 
 # Security Group de l'ALB
 resource "aws_security_group" "alb" {
+  #checkov:skip=CKV_AWS_260:ALB de demonstration HTTP pour le TP S04, sans certificat TLS
   name        = "novasphere-${var.environment}-alb"
   description = "Autoriser HTTP depuis Internet vers ALB"
   vpc_id      = module.vpc.vpc_id
@@ -127,6 +128,9 @@ resource "aws_launch_template" "web" {
   name_prefix   = "novasphere-${var.environment}-"
   image_id      = data.aws_ami.debian.id
   instance_type = var.instance_type
+  iam_instance_profile {
+    name = aws_iam_instance_profile.web.name
+  }
 
   vpc_security_group_ids = [aws_security_group.web.id]
   user_data              = base64encode(file("${path.module}/bootstrap.sh"))
@@ -135,13 +139,18 @@ resource "aws_launch_template" "web" {
     resource_type = "instance"
     tags          = { Name = "novasphere-${var.environment}-web" }
   }
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
 }
 
 resource "aws_lb" "web" {
-  name               = "novasphere-${var.environment}"
-  load_balancer_type = "application"
-  subnets            = module.vpc.public_subnets
-  security_groups    = [aws_security_group.alb.id]
+  name                       = "novasphere-${var.environment}"
+  load_balancer_type         = "application"
+  subnets                    = module.vpc.public_subnets
+  security_groups            = [aws_security_group.alb.id]
+  drop_invalid_header_fields = true
 }
 
 resource "aws_lb_target_group" "web" {
@@ -191,3 +200,46 @@ resource "aws_autoscaling_group" "web" {
 output "alb_dns_name" {
   value = aws_lb.web.dns_name
 }
+
+resource "aws_ssm_parameter" "db_password" {
+  name             = "/novasphere/${var.environment}/db_password"
+  type             = "SecureString"
+  value_wo         = var.db_password
+  value_wo_version = 1
+}
+
+
+data "aws_iam_policy_document" "ec2_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "web" {
+  name               = "novasphere-${var.environment}-web"
+  assume_role_policy = data.aws_iam_policy_document.ec2_assume.json
+}
+
+resource "aws_iam_role_policy" "read_secrets" {
+  name = "read-secrets"
+  role = aws_iam_role.web.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = "arn:aws:ssm:us-east-1:615785053867:parameter/novasphere/${var.environment}/db_password"
+    }]
+  })
+}
+
+resource "aws_iam_instance_profile" "web" {
+  name = "novasphere-${var.environment}-web"
+  role = aws_iam_role.web.name
+}
+

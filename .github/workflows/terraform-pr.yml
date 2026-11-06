@@ -50,6 +50,8 @@ jobs:
         id: plan
         env:
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_owner: ${{ vars.OWNER }}
+          TF_VAR_environment: dev
         run: |
           set +e
           terraform plan -no-color -input=false > plan.txt 2>&1

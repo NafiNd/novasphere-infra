@@ -46,6 +46,14 @@ jobs:
       - name: Valider Terraform
         run: terraform validate
 
+      - name: Preparer la cle SSH publique
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PUBLIC_KEY" > ~/.ssh/novasphere.pub
+          chmod 644 ~/.ssh/novasphere.pub
+
       - name: Generer le plan
         id: plan
         env:

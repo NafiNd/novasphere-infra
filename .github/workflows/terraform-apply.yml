@@ -1,4 +1,3 @@
-
 name: Terraform Apply
 
 on:
@@ -11,16 +10,26 @@ on:
       - ".github/workflows/terraform-apply.yml"
   schedule:
     - cron: "0 2 * * *"
-
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Environnement à déployer"
+        required: true
+        type: choice
+        default: dev
+        options:
+          - dev
+          - prod
+
 permissions:
   id-token: write
   contents: read
 
 jobs:
   apply-dev:
-    if: ${{ vars.ENABLE_TERRAFORM_APPLY == 'true' }}
+    if: ${{ vars.ENABLE_TERRAFORM_APPLY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: envs/dev
@@ -34,22 +43,46 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_DEV }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      - run: terraform init -input=false
+      - name: SSH publique
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          test -n "$SSH_PUBLIC_KEY" || { echo "SSH_PUBLIC_KEY manquant"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PUBLIC_KEY" > ~/.ssh/novasphere.pub
+          chmod 644 ~/.ssh/novasphere.pub
 
-      - run: terraform validate
+      - name: Initialiser Terraform
+        run: terraform init -input=false
+
+      - name: Valider Terraform
+        run: terraform validate
+
+      - name: Plan DEV
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_owner: ${{ vars.OWNER }}
+          TF_VAR_environment: dev
+        run: terraform plan -input=false -no-color -out=tfplan
 
       - name: Apply DEV
         env:
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
-        run: terraform apply -auto-approve -input=false
+          TF_VAR_owner: ${{ vars.OWNER }}
+          TF_VAR_environment: dev
+        run: terraform apply -input=false tfplan
 
   apply-prod:
     needs: apply-dev
+    if: ${{ vars.ENABLE_TERRAFORM_APPLY == 'true' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod')) }}
     runs-on: ubuntu-latest
     environment: prod
+
     defaults:
       run:
         working-directory: envs/prod
@@ -68,14 +101,34 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      - run: terraform init -input=false
+      - name: Preparer la cle SSH publique
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          test -n "$SSH_PUBLIC_KEY" || { echo "SSH_PUBLIC_KEY manquant"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PUBLIC_KEY" > ~/.ssh/novasphere.pub
+          chmod 644 ~/.ssh/novasphere.pub
 
-      - run: terraform validate
+      - name: Initialiser Terraform
+        run: terraform init -input=false
+
+      - name: Valider Terraform
+        run: terraform validate
+
+      - name: Plan PROD
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD_PROD }}
+          TF_VAR_owner: ${{ vars.OWNER }}
+          TF_VAR_environment: prod
+        run: terraform plan -input=false -no-color -out=tfplan
 
       - name: Apply PROD
         env:
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD_PROD }}
-        run: terraform apply -auto-approve -input=false
+          TF_VAR_owner: ${{ vars.OWNER }}
+          TF_VAR_environment: prod
+        run: terraform apply -input=false tfplan
 
   drift:
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -86,22 +139,42 @@ jobs:
         working-directory: envs/dev
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Recuperer le code
+        uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Installer Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.16.1"
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configurer AWS Academy
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_DEV }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      - run: terraform init -input=false
+      - name: Preparer la cle SSH publique
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          test -n "$SSH_PUBLIC_KEY" || { echo "SSH_PUBLIC_KEY manquant"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PUBLIC_KEY" > ~/.ssh/novasphere.pub
+          chmod 644 ~/.ssh/novasphere.pub
+
+      - name: Initialiser Terraform
+        run: terraform init -input=false
+
+      - name: Valider Terraform
+        run: terraform validate
 
       - name: Detecter le drift
         env:
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_owner: ${{ vars.OWNER }}
+          TF_VAR_environment: dev
         run: |
           set +e
           terraform plan -detailed-exitcode -input=false -no-color
@@ -116,4 +189,3 @@ jobs:
             echo "Erreur Terraform"
             exit 1
           fi
-

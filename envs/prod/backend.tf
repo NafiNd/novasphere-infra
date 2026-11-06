@@ -1,4 +1,4 @@
-# envs/dev/backend.tf
+# envs/prod/backend.tf
 terraform {
   backend "s3" {
     bucket       = "novasphere-tfstate-naf"

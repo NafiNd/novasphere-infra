@@ -37,4 +37,4 @@ ansible/     site.yml, ansible.cfg, roles/web (tasks, handlers, templates, defau
 scripts/     stop-evening.sh, start-morning.sh
 ```
 
-Le fichier `ansible/inventory.ini` n'est pas versionne : il est produit par `terraform apply`.
+Le fichier `ansible/inventory.ini` n'est pas versionne : il est produit par `terraform apply`

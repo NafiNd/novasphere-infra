@@ -60,7 +60,7 @@ resource "aws_launch_template" "web" {
   image_id      = data.aws_ami.debian.id
   instance_type = var.instance_type
   iam_instance_profile {
-    name = aws_iam_instance_profile.web.name
+    name = "LabInstanceProfile"
   }
 
   vpc_security_group_ids = [aws_security_group.web.id]

@@ -17,7 +17,7 @@ terraform {
   }
 }
 # Backend local pour demarrer. La S1 du module Bac+5 migre ce state
-# vers un backend S3 partage avec verrouillage natif
+# vers un backend S3 partage avec verrouillage natifgtrehj,gf
 
 provider "aws" {
   region = var.aws_region

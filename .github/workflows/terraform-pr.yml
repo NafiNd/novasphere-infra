@@ -55,6 +55,12 @@ jobs:
           terraform plan -no-color -input=false > plan.txt 2>&1
           code=$?
           echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+
+          if [ "$code" -ne 0 ]; then
+            echo "ERREUR TERRAFORM :"
+            grep -A 15 -E '^Error:|^│ Error:' plan.txt || true
+          fi
+
           exit 0
 
       - name: Commenter la pull request
